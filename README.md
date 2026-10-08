@@ -112,4 +112,4 @@ Issues and pull requests are welcome. Please describe the problem or feature cle
 
 ## License
 
-Add a license of your choice (for example, MIT) before publishing.
+[MIT](LICENSE)
