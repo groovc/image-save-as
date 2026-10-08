@@ -17,10 +17,10 @@ Browsers usually save images in whatever format the site serves, which is often 
 
 The extension isn't on the Chrome Web Store yet. To load it as an unpacked extension:
 
-1. Clone or download this repository.
+1. Download the zip from the [latest release](https://github.com/groovc/image-save-as/releases/latest) and unzip it, or clone this repository.
 2. Open `chrome://extensions` in Chrome.
 3. Turn on **Developer mode** (top-right toggle).
-4. Click **Load unpacked** and select this project folder.
+4. Click **Load unpacked** and select the unzipped folder (or the repository folder).
 5. Optionally, pin the extension from the puzzle-piece menu in the toolbar.
 
 ## Usage
@@ -98,17 +98,26 @@ image-save-as/
 ├── background.js      # Service worker: context menu, enabled state, downloads
 ├── offscreen/         # Offscreen document: fetching, format detection, conversion
 ├── lib/formats.js     # Format sniffing and filename helpers
-├── popup/             # Enable/disable toggle and last error
-└── icons/             # Extension icons
+├── popup/             # Enable/disable toggle, settings and last error
+├── icons/             # Extension icons
+├── tests/             # Download lifecycle tests (node --test tests/)
+├── scripts/package.sh # Builds the release / Web Store zip
+└── store/             # Chrome Web Store listing copy and promo image
 ```
 
-Edit the source, then click the reload icon on the extension's card at `chrome://extensions` to pick up your changes.
+Edit the source, then click the reload icon on the extension's card at `chrome://extensions` to pick up your changes. Run the tests with `node --test tests/`.
+
+To build a release, bump `version` in `manifest.json` and run `./scripts/package.sh`. It writes `dist/image-save-as-<version>.zip` with only the extension's files, ready to attach to a GitHub release or upload to the Chrome Web Store.
 
 Run the download lifecycle regression tests with `node --test tests/background.test.cjs` (Node.js required). These use mocked Chrome APIs; verify browser behavior with the unpacked extension.
 
 ## Contributing
 
 Issues and pull requests are welcome. Please describe the problem or feature clearly and include the page or image URL where you saw it, if relevant.
+
+## Privacy
+
+Image Save As collects no data. See the [privacy policy](PRIVACY.md).
 
 ## License
 

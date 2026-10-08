@@ -10,6 +10,8 @@ Image Save As is a Manifest V3 Chrome extension that adds a right-click "Save im
 
 - Load the folder as an unpacked extension at `chrome://extensions` (Developer mode → Load unpacked). Click the reload icon on its card after each change.
 - Service worker logs: "Inspect views: service worker" on the extension card. The offscreen document shows up there too, while it's open.
+- Release zip: bump `version` in `manifest.json`, then `./scripts/package.sh` → `dist/image-save-as-<version>.zip` (gitignored). The script's `FILES` list is the allowlist of what ships. Add new runtime files or folders there. Attach the zip to a GitHub release tagged `v<version>` and upload the same zip to the Chrome Web Store.
+- Store copy (permission justifications, privacy answers) lives in `store/listing.md`, and the policy in `PRIVACY.md`. Update both if permissions or data handling change. `store/promo-small.png` is rendered from `store/promo-small.html` with headless Chrome (command in the file).
 - Run download lifecycle regression tests with `node --test tests/background.test.cjs`. Run one test with `--test-name-pattern="in-flight"`. The harness loads `background.js` as a plain script in a `vm` context with a mocked `chrome` object, so adding an `import` to `background.js` would break it. There is no linter. `lib/formats.js` has no `chrome.*` dependencies, so it can be imported and tested directly in Node. `node --check --input-type=module < file.js` syntax-checks a file.
 
 ## Architecture
