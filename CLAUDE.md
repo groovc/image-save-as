@@ -10,16 +10,17 @@ Image Save As is a Manifest V3 Chrome extension that adds a right-click "Save im
 
 - Load the folder as an unpacked extension at `chrome://extensions` (Developer mode → Load unpacked). Click the reload icon on its card after each change.
 - Service worker logs: "Inspect views: service worker" on the extension card. The offscreen document shows up there too, while it's open.
-- There is no test suite or linter. `lib/formats.js` has no `chrome.*` dependencies, so it can be imported and tested directly in Node. `node --check --input-type=module < file.js` syntax-checks a file.
+- Run download lifecycle regression tests with `node --test tests/background.test.cjs`. Run one test with `--test-name-pattern="in-flight"`. The harness loads `background.js` as a plain script in a `vm` context with a mocked `chrome` object, so adding an `import` to `background.js` would break it. There is no linter. `lib/formats.js` has no `chrome.*` dependencies, so it can be imported and tested directly in Node. `node --check --input-type=module < file.js` syntax-checks a file.
 
 ## Architecture
 
 The work is split three ways because of MV3 API limits:
 
-- **`background.js` (service worker)** owns the context menu, the `enabled` flag (`chrome.storage.local`, default true) and `chrome.downloads`. It can't decode SVG or call `URL.createObjectURL`, so it hands every save to the offscreen document.
+- **`background.js` (service worker)** owns the context menu, reads settings and calls `chrome.downloads`. It can't decode SVG or call `URL.createObjectURL`, so it hands every save to the offscreen document.
 - **`offscreen/offscreen.js`** fetches the image, detects its format, converts it if needed, and returns `{ url: blobUrl, filename }`. It has no `downloads` API, so the service worker does the download.
+- **Settings** live in `chrome.storage.local`: `enabled` (true), `askWhereToSave` (true) and `quality` (92, range 50–100). Defaults are in `DEFAULT_SETTINGS`, which is duplicated in `background.js` and `popup/popup.js`, so change both. The service worker reads settings on each save and passes `quality` in the `prepare` message.
 - **Messaging** goes through `chrome.runtime.sendMessage` with `target: 'offscreen'`. Types are `prepare` (returns the result or `{ error }`) and `revoke`. Runtime messages are JSON-serialized, so bytes can't be passed directly. That's why the result travels as a blob URL.
-- **Blob URL lifetime:** blob URLs live in the offscreen document. The service worker maps download id → blob URL in `chrome.storage.session` (it may be suspended mid-download). It sends `revoke` when `downloads.onChanged` reports complete or interrupted.
+- **Blob URL lifetime:** blob URLs live in the offscreen document. The service worker maps download id → blob URL in `chrome.storage.session` (it may be suspended mid-download). It sends `revoke` when `downloads.onChanged` reports complete or interrupted. A download can finish before its record is saved, so `saveImage` re-checks the state with `downloads.search` after registering. `finishDownload` deduplicates concurrent cleanup per download id. The `await finishingDownloads.get(...)` before the re-check is required, not redundant: an in-flight handler may already have read an empty record. Interrupted downloads report an error unless the error is `USER_CANCELED`.
 - **Errors** are shown as a red `!` badge. The message is stored in `chrome.storage.session.lastError`, which the popup displays.
 - **Menu item ids** are `save-as-format:<format>`, where format is `png`, `jpeg`, `webp` or `original`. These keys match `CONVERTIBLE` and `FORMAT_INFO` in `lib/formats.js`.
 

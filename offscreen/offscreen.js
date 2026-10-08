@@ -6,12 +6,12 @@ import { CONVERTIBLE, FORMAT_INFO, baseName, detectFormat } from '../lib/formats
 // Ask for the same formats Chrome requests for <img>, so content negotiation
 // returns the file the user is looking at.
 const IMAGE_ACCEPT = 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8';
-const QUALITY = 0.92;
+const DEFAULT_QUALITY = 92;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.target !== 'offscreen') return false;
   if (message.type === 'prepare') {
-    prepare(message.srcUrl, message.format).then(sendResponse, (err) =>
+    prepare(message.srcUrl, message.format, message.quality ?? DEFAULT_QUALITY).then(sendResponse, (err) =>
       sendResponse({ error: err.message || String(err) }),
     );
     return true;
@@ -20,7 +20,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-async function prepare(srcUrl, requested) {
+// quality is 1–100 and only affects JPEG and WEBP output.
+async function prepare(srcUrl, requested, quality) {
   if (srcUrl.startsWith('blob:')) {
     throw new Error("This image uses a page-only blob: URL, which extensions can't read.");
   }
@@ -47,7 +48,7 @@ async function prepare(srcUrl, requested) {
   const target = CONVERTIBLE[requested];
   if (!target) throw new Error(`Unknown format "${requested}".`);
   const input = new Blob([bytes], { type: source ? FORMAT_INFO[source].mime : blob.type });
-  const output = await convert(input, source, target.mime);
+  const output = await convert(input, source, target.mime, quality / 100);
   return toBlobUrl(output, `${name}.${target.ext}`);
 }
 
@@ -55,7 +56,7 @@ function toBlobUrl(blob, filename) {
   return { url: URL.createObjectURL(blob), filename };
 }
 
-async function convert(blob, source, mime) {
+async function convert(blob, source, mime, quality) {
   const decoded = await decode(blob, source);
   try {
     const { image, width, height } = decoded;
@@ -67,7 +68,7 @@ async function convert(blob, source, mime) {
       ctx.fillRect(0, 0, width, height);
     }
     ctx.drawImage(image, 0, 0, width, height);
-    const output = await canvas.convertToBlob({ type: mime, quality: QUALITY });
+    const output = await canvas.convertToBlob({ type: mime, quality });
     // convertToBlob silently falls back to PNG for types it can't encode.
     if (output.type !== mime) throw new Error(`Chrome couldn't encode ${mime}.`);
     return output;

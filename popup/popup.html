@@ -18,6 +18,22 @@
     </label>
 
     <p id="status" class="status"></p>
+
+    <fieldset id="settings">
+      <label class="toggle">
+        <span>Ask where to save each file</span>
+        <input type="checkbox" id="askWhereToSave" role="switch" />
+      </label>
+
+      <label class="slider" for="quality">
+        <span class="slider-label">
+          <span>JPEG / WEBP quality</span>
+          <output id="qualityValue" for="quality"></output>
+        </span>
+        <input type="range" id="quality" min="50" max="100" step="1" />
+      </label>
+    </fieldset>
+
     <p id="error" class="error" hidden></p>
   </body>
 </html>

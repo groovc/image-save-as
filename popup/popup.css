@@ -94,6 +94,40 @@ h1 {
   color: var(--muted);
 }
 
+fieldset {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0 0;
+  padding: 14px 0 0;
+  border: 0;
+  border-top: 1px solid var(--track);
+}
+
+fieldset:disabled {
+  opacity: 0.5;
+}
+
+.slider {
+  display: grid;
+  gap: 6px;
+}
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+}
+
+.slider output {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.slider input {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .error {
   margin: 10px 0 0;
   padding: 8px 10px;

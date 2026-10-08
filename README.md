@@ -10,6 +10,8 @@ Browsers usually save images in whatever format the site serves, which is often 
 - Convert and save as **PNG**, **JPEG / JPG** or **WEBP**
 - Save **AVIF**, **GIF**, **SVG** (or any other image) in its original format, without conversion
 - Can be switched on and off, so it stays out of the way when you don't need it
+- Optionally save straight to your Downloads folder without a dialog
+- Adjustable JPEG / WEBP quality
 
 ## Installation
 
@@ -26,9 +28,19 @@ The extension isn't on the Chrome Web Store yet. To load it as an unpacked exten
 1. Click the extension icon and make sure it is **enabled**.
 2. Right-click an image on any web page.
 3. Choose **Save image as format…**, then **PNG**, **JPEG**, **WEBP** or **Original format**.
-4. Pick a location in the save dialog.
+4. Pick a location in the save dialog (unless you've turned it off, see below).
 
 If a save fails, the toolbar icon shows a red **!** and the popup explains what went wrong.
+
+## Settings
+
+Click the toolbar icon to open the popup:
+
+| Setting | Default | What it does |
+| ------- | ------- | ------------ |
+| Enable right-click menu | On | Shows or hides the menu item. |
+| Ask where to save each file | On | When off, files go straight to your Downloads folder. Name clashes get a number added, like `photo (1).png`. |
+| JPEG / WEBP quality | 92% | 50–100%. Lower means smaller files. Doesn't affect PNG or files saved in their original format. |
 
 ## Supported formats
 
@@ -91,6 +103,8 @@ image-save-as/
 ```
 
 Edit the source, then click the reload icon on the extension's card at `chrome://extensions` to pick up your changes.
+
+Run the download lifecycle regression tests with `node --test tests/background.test.cjs` (Node.js required). These use mocked Chrome APIs; verify browser behavior with the unpacked extension.
 
 ## Contributing
 

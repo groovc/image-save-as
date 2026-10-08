@@ -10,8 +10,16 @@ const MENU_ITEMS = [
   { type: 'separator' },
   { format: 'original', title: 'Original format (AVIF, GIF, SVG…)' },
 ];
+// Defaults for settings in chrome.storage.local. Keep in sync with popup/popup.js.
+const DEFAULT_SETTINGS = { enabled: true, askWhereToSave: true, quality: 92 };
 const OFFSCREEN_PATH = 'offscreen/offscreen.html';
 const ERROR_BADGE_MS = 8000;
+const DOWNLOAD_ERRORS = {
+  FILE_NO_SPACE: 'Not enough disk space',
+  FILE_ACCESS_DENIED: 'No permission to save there',
+  FILE_NAME_TOO_LONG: 'File name too long',
+};
+let errorBadgeTimer;
 
 chrome.runtime.onInstalled.addListener(async () => {
   await chrome.contextMenus.removeAll();
@@ -45,7 +53,6 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
   if (parent !== MENU_ID || !format || !info.srcUrl) return;
   try {
     await saveImage(info.srcUrl, format);
-    await chrome.storage.session.remove('lastError');
   } catch (err) {
     await showError(err.message || String(err));
   }
@@ -53,18 +60,36 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
 
 // Release the blob URL once Chrome has finished writing the file.
 chrome.downloads.onChanged.addListener(async (delta) => {
-  const state = delta.state?.current;
-  if (state !== 'complete' && state !== 'interrupted') return;
-  const key = `download:${delta.id}`;
-  const { [key]: blobUrl } = await chrome.storage.session.get(key);
-  if (!blobUrl) return;
-  await chrome.storage.session.remove(key);
-  revokeBlobUrl(blobUrl);
+  await finishDownload(delta.id, delta.state?.current, delta.error?.current);
 });
 
+// Events and the post-registration check can observe the same terminal state.
+const finishingDownloads = new Map();
+function finishDownload(id, state, error) {
+  if (state !== 'complete' && state !== 'interrupted') return;
+  if (finishingDownloads.has(id)) return finishingDownloads.get(id);
+  const task = (async () => {
+    const key = `download:${id}`;
+    const { [key]: blobUrl } = await chrome.storage.session.get(key);
+    // Download events include files started elsewhere in the browser.
+    if (!blobUrl) return;
+    await chrome.storage.session.remove(key);
+    revokeBlobUrl(blobUrl);
+    if (state === 'interrupted' && error !== 'USER_CANCELED') {
+      const reason = DOWNLOAD_ERRORS[error] || error || 'Download interrupted';
+      await showError(`Couldn't save the image (${reason}).`);
+    }
+  })().finally(() => finishingDownloads.delete(id));
+  finishingDownloads.set(id, task);
+  return task;
+}
+
+async function getSettings() {
+  return chrome.storage.local.get(DEFAULT_SETTINGS);
+}
+
 async function isEnabled() {
-  const { enabled = true } = await chrome.storage.local.get('enabled');
-  return enabled;
+  return (await getSettings()).enabled;
 }
 
 async function applyEnabled() {
@@ -76,14 +101,24 @@ async function applyEnabled() {
 }
 
 async function saveImage(srcUrl, format) {
+  const { askWhereToSave, quality } = await getSettings();
   await ensureOffscreen();
-  const result = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'prepare', srcUrl, format });
+  const result = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'prepare', srcUrl, format, quality });
   if (!result) throw new Error('The image converter did not respond.');
   if (result.error) throw new Error(result.error);
 
   let downloadId;
   try {
-    downloadId = await chrome.downloads.download({ url: result.url, filename: result.filename, saveAs: true });
+    // Clear the previous error before download events can report a new one.
+    await chrome.storage.session.remove('lastError');
+    clearTimeout(errorBadgeTimer);
+    await applyEnabled();
+    downloadId = await chrome.downloads.download({
+      url: result.url,
+      filename: result.filename,
+      saveAs: askWhereToSave,
+      conflictAction: 'uniquify',
+    });
   } catch (err) {
     revokeBlobUrl(result.url);
     // Closing the save dialog isn't an error worth reporting.
@@ -91,6 +126,12 @@ async function saveImage(srcUrl, format) {
     throw err;
   }
   await chrome.storage.session.set({ [`download:${downloadId}`]: result.url });
+  // Small downloads can finish before their blob URL is registered above.
+  const [download] = await chrome.downloads.search({ id: downloadId });
+  // An earlier handler may still be finishing after reading an empty record.
+  // Wait for it so the following call retries cleanup with the registered URL.
+  await finishingDownloads.get(downloadId);
+  if (download) await finishDownload(downloadId, download.state, download.error);
 }
 
 let creatingOffscreen;
@@ -124,5 +165,6 @@ async function showError(message) {
   await chrome.action.setBadgeBackgroundColor({ color: '#dc2626' });
   await chrome.action.setBadgeText({ text: '!' });
   await chrome.action.setTitle({ title: `Image Save As: ${message}` });
-  setTimeout(applyEnabled, ERROR_BADGE_MS);
+  clearTimeout(errorBadgeTimer);
+  errorBadgeTimer = setTimeout(applyEnabled, ERROR_BADGE_MS);
 }
