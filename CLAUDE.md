@@ -37,6 +37,6 @@ The work is split three ways because of MV3 API limits:
 
 ## Constraints
 
-- **`host_permissions: ["<all_urls>"]` is required.** Images are usually on a different origin than the page, so `activeTab` isn't enough.
+- **`host_permissions: ["<all_urls>"]` is required.** Images are usually on a different origin than the page, so `activeTab` isn't enough. The Chrome Web Store flags this for in-depth review. Per-domain `optional_host_permissions` requested at save time was considered and deferred. Keep `<all_urls>` unless the user revisits it.
 - **Known unsupported cases:** `blob:` URLs, CSS backgrounds and `<canvas>` elements (no image context menu), signed-in-only images, and Referer-based hotlink protection.
 - **Icons** in `icons/` are generated PNGs (a blue rounded square with a white picture glyph). Regenerate all four sizes together if the design changes.
